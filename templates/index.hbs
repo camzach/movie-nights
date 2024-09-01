@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
   </head>
   <body>
     <div id="wheel" style="height: 300px; width: 300px;"></div>
@@ -16,6 +17,8 @@
       <thead>
         <tr>
           <th>Title</th>
+          <th>Year</th>
+          <th>Director</th>
           <th>Proposed By</th>
           <th>Proposed On</th>
           <th>Times Vetoed</th>
@@ -24,18 +27,22 @@
       <tbody>
         {{#each this}}
           <tr>
-            <td>{{this.title}}</td>
-            <td>{{this.proposed_by}}</td>
-            <td>{{this.proposed_on}}</td>
-            <td>{{this.vetos}}</td>
+            <td>{{this.api_info.title}}</td>
+            <td>{{this.api_info.year}}</td>
+            <td>{{this.api_info.director}}</td>
+            <td>{{this.db_info.proposed_by}}</td>
+            <td>{{this.db_info.proposed_on}}</td>
+            <td>{{this.db_info.vetos}}</td>
           </tr>
         {{/each}}
       </tbody>
     </table>
     <form action="" onsubmit="return false;">
-      <input type="text" name="proposed_by" placeholder="Your Name">
-      <input type="text" name="imdb_id" placeholder="IMDb ID">
-      <button type="button">Submit Movie</button>
+      <fieldset class="grid">
+        <label>Your Name<input type="text" name="proposed_by" placeholder="Your Name"></label>
+        <label>IMDb ID or Link<input type="text" name="imdb_id" placeholder="IMDb ID"></label>
+      </fieldset>
+      <input type="submit" value="Submit Movie">
     </form>
     <script src="https://cdn.jsdelivr.net/npm/spin-wheel@5.0.1/dist/spin-wheel-iife.js"></script>
     <script>
@@ -58,14 +65,8 @@
         items: [
           {{#each this}}
           {
-            label: "{{this.title}}",
-            value: {
-              vetos: {{this.vetos}},
-              imdb_id: "{{this.imdb_id}}",
-              title: "{{this.title}}",
-              proposed_by: "{{this.proposed_by}}",
-              proposed_on: "{{this.proposed_on}}",
-            },
+            label: "{{this.api_info.title}}",
+            value: {{{toJSON this}}},
             backgroundColor: `hsl(${Math.random() * 360}deg 100% 50%)`,
           },
           {{/each}}
@@ -125,7 +126,7 @@
             .then(res => res.json())
             .then(updateMovies);
         }
-        document.querySelector('form button').addEventListener('click', newMovie);
+        document.querySelector('form [type=submit]').addEventListener('click', newMovie);
 
         function updateMovies(newList) {
           console.log(newList);
@@ -135,19 +136,25 @@
             backgroundColor: `hsl(${Math.random() * 360}deg 100% 50%)`
           }))
           const newTable = new DocumentFragment();
-          for (const item of newList) {
+          for (const item of newList) {          
             let row = document.createElement('tr');
             const title = document.createElement('td');
-            title.innerText = item.title;
+            title.innerText = item.api_info.title;
             row.appendChild(title);
+            const year = document.createElement('td');
+            year.innerText = item.api_info.year;
+            row.appendChild(year);
+            const director = document.createElement('td');
+            director.innerText = item.api_info.director;
+            row.appendChild(director);
             const proposed_by = document.createElement('td');
-            proposed_by.innerText = item.proposed_by;
+            proposed_by.innerText = item.db_info.proposed_by;
             row.appendChild(proposed_by);
             const proposed_on = document.createElement('td');
-            proposed_on.innerText = item.proposed_on;
+            proposed_on.innerText = item.db_info.proposed_on;
             row.appendChild(proposed_on);
             const vetos = document.createElement('td');
-            vetos.innerText = item.vetos;
+            vetos.innerText = item.db_info.vetos;
             row.appendChild(vetos);
 
             newTable.appendChild(row);

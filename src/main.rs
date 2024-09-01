@@ -5,7 +5,7 @@ use axum::{
     routing::{get, post},
     Form, Json, Router,
 };
-use handlebars::Handlebars;
+use handlebars::{handlebars_helper, Handlebars};
 use regex::Regex;
 use reqwest::Client;
 use rust_embed::RustEmbed;
@@ -92,6 +92,13 @@ async fn main() {
     handlebars
         .register_embed_templates::<Assets>()
         .expect("Failed to register template");
+    handlebars_helper!(toJSON: |json_obj_or_none: object|
+    if json_obj_or_none.is_empty() {
+        "{}".into()
+    } else {
+        serde_json::to_string(&json_obj_or_none).unwrap_or_else(|_| "{}".to_string())
+    });
+    handlebars.register_helper("toJSON", Box::new(toJSON));
 
     let reqwest_client = reqwest::Client::builder().use_rustls_tls().build().unwrap();
 
@@ -111,18 +118,25 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct OMDbResponse {
-    Title: String,
+    #[serde(alias = "Title")]
+    title: String,
+    #[serde(alias = "Year")]
+    year: String,
+    #[serde(alias = "Director")]
+    director: String,
+    #[serde(alias = "Genre")]
+    genre: String,
+    #[serde(alias = "Plot")]
+    plot: String,
+    #[serde(alias = "Poster")]
+    poster: String,
 }
 #[derive(Serialize)]
 struct MovieListing {
-    title: String,
-    proposed_by: String,
-    #[serde(serialize_with = "serialize_date")]
-    proposed_on: Date,
-    vetos: i32,
-    imdb_id: String,
+    api_info: OMDbResponse,
+    db_info: MovieProposal,
 }
 
 async fn index(
@@ -157,7 +171,7 @@ async fn json_movies_from_db(
             .query(&[("apikey", &api_key), ("i", &row.imdb_id)])
             .build()
             .expect("Failed to build odmb query");
-        let resposne = client
+        let response = client
             .execute(request)
             .await
             .expect("Failed to execute omdb query")
@@ -165,11 +179,8 @@ async fn json_movies_from_db(
             .await
             .expect("Failed to parse omdb response to json");
         listings.push(MovieListing {
-            title: resposne.Title,
-            proposed_by: row.proposed_by,
-            proposed_on: row.proposed_on,
-            vetos: row.vetos,
-            imdb_id: row.imdb_id,
+            api_info: response,
+            db_info: row,
         });
     }
     listings

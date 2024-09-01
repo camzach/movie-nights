@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="wheel" style="height: 300px; width: 300px;"></div>
+    <dialog>
+      <span></span>
+      <button id="watch" onclick="watch()">Watch</button>
+      <button id="veto" onclick="veto()">Veto</button>
+    </dialog>
+    <table id="list">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Proposed By</th>
+          <th>Proposed On</th>
+          <th>Times Vetoed</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each this}}
+          <tr>
+            <td>{{this.title}}</td>
+            <td>{{this.proposed_by}}</td>
+            <td>{{this.proposed_on}}</td>
+            <td>{{this.vetos}}</td>
+          </tr>
+        {{/each}}
+      </tbody>
+    </table>
+    <form action="" onsubmit="return false;">
+      <input type="text" name="proposed_by" placeholder="Your Name">
+      <input type="text" name="imdb_id" placeholder="IMDb ID">
+      <button type="button">Submit Movie</button>
+    </form>
+    <script src="https://cdn.jsdelivr.net/npm/spin-wheel@5.0.1/dist/spin-wheel-iife.js"></script>
+    <script>
+      const pointerCanvas = document.createElement('canvas');
+      pointerCanvas.height = 300;
+      pointerCanvas.width = 300;
+      const ctx = pointerCanvas.getContext('2d');
+      ctx.beginPath();
+      ctx.fillStyle='red';
+      ctx.moveTo(275,150);
+      ctx.lineTo(300,137.5);
+      ctx.lineTo(300,163.5);
+      ctx.fill();
+      const pointer = new Image()
+      pointer.src = pointerCanvas.toDataURL();
+
+      const { Wheel } = spinWheel;
+
+      const wheel = new Wheel(document.querySelector('#wheel'), {
+        items: [
+          {{#each this}}
+          {
+            label: "{{this.title}}",
+            value: {
+              vetos: {{this.vetos}},
+              imdb_id: "{{this.imdb_id}}",
+              title: "{{this.title}}",
+              proposed_by: "{{this.proposed_by}}",
+              proposed_on: "{{this.proposed_on}}",
+            },
+            backgroundColor: `hsl(${Math.random() * 360}deg 100% 50%)`,
+          },
+          {{/each}}
+        ],
+        isInteractive: false,
+        pointerAngle: 90,
+        overlayImage: pointer
+      });
+
+      let choice;
+      document.querySelector('#wheel').addEventListener('click', () => {
+        choice = Math.floor(Math.random() * wheel.items.length);
+        wheel.spinToItem(choice, 3000, false, Math.floor(Math.random() * 3) + 1)
+      });
+
+      wheel.onRest = () => {
+        document.querySelector('dialog span').innerText = wheel.items[choice].label;
+        document.querySelector('#veto').disabled = wheel.items[choice].value.vetos >= 3;
+        document.querySelector('dialog').showModal();
+      }
+
+      document.querySelector('dialog').addEventListener('cancel', e => e.preventDefault());
+
+      function watch() {
+        const thisItem = wheel.items[choice];
+        fetch("/movies/watch", {
+          method: "POST",
+          body: new URLSearchParams({ imdb_id: thisItem.value.imdb_id })
+        }).then(() => {
+          updateMovies(wheel.items.flatMap(i => i === thisItem ? [] : [i.value]))
+          document.querySelector('dialog').close();
+        })
+      }
+
+      function veto() {
+        const thisItem = wheel.items[choice];
+        fetch("/movies/veto", {
+          method: "POST",
+          body: new URLSearchParams({ imdb_id: thisItem.value.imdb_id })
+        }).then(() => {
+          updateMovies(wheel.items.map(i =>
+            i === thisItem
+              ? { ...i.value, vetos: i.value.vetos + 1 }
+              : i.value
+          ))
+          document.querySelector('dialog').close();
+        })
+      }
+
+      function newMovie() {
+          const formData = new FormData(document.querySelector('form'));
+          fetch("/movies", {
+            method: "POST",
+            body: new URLSearchParams(formData),
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+          })
+            .then(res => res.json())
+            .then(updateMovies);
+        }
+        document.querySelector('form button').addEventListener('click', newMovie);
+
+        function updateMovies(newList) {
+          console.log(newList);
+          wheel.items = newList.map(item => ({
+            label: item.title,
+            value: item,
+            backgroundColor: `hsl(${Math.random() * 360}deg 100% 50%)`
+          }))
+          const newTable = new DocumentFragment();
+          for (const item of newList) {
+            let row = document.createElement('tr');
+            const title = document.createElement('td');
+            title.innerText = item.title;
+            row.appendChild(title);
+            const proposed_by = document.createElement('td');
+            proposed_by.innerText = item.proposed_by;
+            row.appendChild(proposed_by);
+            const proposed_on = document.createElement('td');
+            proposed_on.innerText = item.proposed_on;
+            row.appendChild(proposed_on);
+            const vetos = document.createElement('td');
+            vetos.innerText = item.vetos;
+            row.appendChild(vetos);
+
+            newTable.appendChild(row);
+          }
+          document.querySelector('table tbody').innerHTML = "";
+          document.querySelector('table tbody').appendChild(newTable);
+        }
+    </script>
+  </body>
+</html>

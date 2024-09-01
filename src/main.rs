@@ -6,6 +6,7 @@ use axum::{
     Form, Json, Router,
 };
 use handlebars::Handlebars;
+use regex::Regex;
 use reqwest::Client;
 use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize, Serializer};
@@ -215,9 +216,14 @@ async fn add_movie(
     }): State<AppState<'_>>,
     Form(body): Form<AddMovieBody>,
 ) -> Result<Json<Vec<MovieListing>>, (StatusCode, String)> {
+    let parsed_id = Regex::new(r#"[a-z]{2}\d+"#)
+        .unwrap()
+        .find(&body.imdb_id)
+        .unwrap()
+        .as_str();
     sqlx::query!(
         "INSERT INTO movies (imdb_id, proposed_on, proposed_by) VALUES ($1, CURRENT_DATE, $2)",
-        body.imdb_id,
+        parsed_id,
         body.proposed_by
     )
     .execute(&pool)

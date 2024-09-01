@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
   </head>
   <body>
-    <div id="wheel" style="height: 300px; width: 300px;"></div>
+    <div id="wheel" style="width: 60%; aspect-ratio: 1;"></div>
     <dialog>
       <span></span>
       <button id="watch" onclick="watch()">Watch</button>
@@ -65,7 +65,7 @@
         items: [
           {{#each this}}
           {
-            label: "{{this.api_info.title}}",
+            label: "{{this.api_info.title}} ({{this.api_info.year}})",
             value: {{{toJSON this}}},
             backgroundColor: `hsl(${Math.random() * 360}deg 100% 50%)`,
           },
@@ -131,7 +131,7 @@
         function updateMovies(newList) {
           console.log(newList);
           wheel.items = newList.map(item => ({
-            label: item.title,
+            label: `${item.api_info.title} (${item.api_info.year})`,
             value: item,
             backgroundColor: `hsl(${Math.random() * 360}deg 100% 50%)`
           }))

@@ -5,45 +5,62 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+      main {
+        display: flex;
+        flex-direction: column;
+        padding: 3rem;
+        gap: 3rem;
+      }
+      @media (min-width: 1326px) {
+        main {
+          flex-direction: row;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="wheel" style="width: 60%; aspect-ratio: 1;"></div>
     <dialog>
       <span></span>
       <button id="watch" onclick="watch()">Watch</button>
       <button id="veto" onclick="veto()">Veto</button>
     </dialog>
-    <table id="list">
-      <thead>
-        <tr>
-          <th>Title</th>
-          <th>Year</th>
-          <th>Director</th>
-          <th>Proposed By</th>
-          <th>Proposed On</th>
-          <th>Times Vetoed</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{#each this}}
-          <tr>
-            <td>{{this.api_info.title}}</td>
-            <td>{{this.api_info.year}}</td>
-            <td>{{this.api_info.director}}</td>
-            <td>{{this.db_info.proposed_by}}</td>
-            <td>{{this.db_info.proposed_on}}</td>
-            <td>{{this.db_info.vetos}}</td>
-          </tr>
-        {{/each}}
-      </tbody>
-    </table>
-    <form action="" onsubmit="return false;">
-      <fieldset class="grid">
-        <label>Your Name<input type="text" name="proposed_by" placeholder="Your Name"></label>
-        <label>IMDb ID or Link<input type="text" name="imdb_id" placeholder="IMDb ID"></label>
-      </fieldset>
-      <input type="submit" value="Submit Movie">
-    </form>
+    <main>
+      <div id="wheel"></div>
+      <div>
+        <table id="list">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Year</th>
+              <th>Director</th>
+              <th>Proposed By</th>
+              <th>Proposed On</th>
+              <th>Times Vetoed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each this}}
+              <tr>
+                <td>{{this.api_info.title}}</td>
+                <td>{{this.api_info.year}}</td>
+                <td>{{this.api_info.director}}</td>
+                <td>{{this.db_info.proposed_by}}</td>
+                <td>{{this.db_info.proposed_on}}</td>
+                <td>{{this.db_info.vetos}}</td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+        <form action="" onsubmit="return false;">
+          <fieldset class="grid">
+            <label>Your Name<input type="text" name="proposed_by" placeholder="Your Name"></label>
+            <label>IMDb ID or Link<input type="text" name="imdb_id" placeholder="IMDb ID"></label>
+          </fieldset>
+          <input type="submit" value="Submit Movie">
+        </form>
+      </div>
+    </main>
     <script src="https://cdn.jsdelivr.net/npm/spin-wheel@5.0.1/dist/spin-wheel-iife.js"></script>
     <script>
       const pointerCanvas = document.createElement('canvas');

@@ -15,18 +15,18 @@
       },
       {
         "ordinal": 2,
-        "name": "watched",
-        "type_info": "Date"
+        "name": "proposed_by",
+        "type_info": "Varchar"
       },
       {
         "ordinal": 3,
-        "name": "proposed_on",
-        "type_info": "Date"
+        "name": "watched_at",
+        "type_info": "Timestamp"
       },
       {
         "ordinal": 4,
-        "name": "proposed_by",
-        "type_info": "Varchar"
+        "name": "proposed_at",
+        "type_info": "Timestamp"
       }
     ],
     "parameters": {
@@ -35,8 +35,8 @@
     "nullable": [
       false,
       false,
-      true,
       false,
+      true,
       false
     ]
   },

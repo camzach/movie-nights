@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM movies WHERE watched IS NULL",
+  "query": "SELECT * FROM movies WHERE watched_at IS NULL",
   "describe": {
     "columns": [
       {
@@ -15,18 +15,18 @@
       },
       {
         "ordinal": 2,
-        "name": "watched",
-        "type_info": "Date"
+        "name": "proposed_by",
+        "type_info": "Varchar"
       },
       {
         "ordinal": 3,
-        "name": "proposed_on",
-        "type_info": "Date"
+        "name": "watched_at",
+        "type_info": "Timestamp"
       },
       {
         "ordinal": 4,
-        "name": "proposed_by",
-        "type_info": "Varchar"
+        "name": "proposed_at",
+        "type_info": "Timestamp"
       }
     ],
     "parameters": {
@@ -35,10 +35,10 @@
     "nullable": [
       false,
       false,
-      true,
       false,
+      true,
       false
     ]
   },
-  "hash": "90f8f1c610665d5a45c7be36af3e98db37c894d0427b69e9c88d60a397ed9279"
+  "hash": "23603a631d17a7d74b4a1154db769d037031eef893ad61f455dcb391d7c9d638"
 }

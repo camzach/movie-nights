@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO movies (imdb_id, proposed_at, proposed_by) VALUES ($1, timezone('utc', now()), $2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f49352638a862c23667109199e1b2c282b12e09f98aa270c70321b3cf0177d59"
+}

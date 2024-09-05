@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE movies SET watched_at = timezone('utc', now()) WHERE imdb_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "163c964635645684d8c94690b220626c95242c15b6fa9a5a1f17bab9919c5ac6"
+}

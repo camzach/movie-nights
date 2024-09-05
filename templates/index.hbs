@@ -46,7 +46,7 @@
                 <td>{{this.api_info.year}}</td>
                 <td>{{this.api_info.director}}</td>
                 <td>{{this.db_info.proposed_by}}</td>
-                <td>{{this.db_info.proposed_on}}</td>
+                <td>{{formatDate this.db_info.proposed_at}}</td>
                 <td>{{this.db_info.vetos}}</td>
               </tr>
             {{/each}}
@@ -146,7 +146,7 @@
         document.querySelector('form [type=submit]').addEventListener('click', newMovie);
 
         function updateMovies(newList) {
-          console.log(newList);
+          newList = newList.filter(item => item.db_info.watched_at === null);
           wheel.items = newList.map(item => ({
             label: `${item.api_info.title} (${item.api_info.year})`,
             value: item,
@@ -167,9 +167,9 @@
             const proposed_by = document.createElement('td');
             proposed_by.innerText = item.db_info.proposed_by;
             row.appendChild(proposed_by);
-            const proposed_on = document.createElement('td');
-            proposed_on.innerText = item.db_info.proposed_on;
-            row.appendChild(proposed_on);
+            const proposed_at = document.createElement('td');
+            proposed_at.innerText = formatDate(item.db_info.proposed_at);
+            row.appendChild(proposed_at);
             const vetos = document.createElement('td');
             vetos.innerText = item.db_info.vetos;
             row.appendChild(vetos);
@@ -178,6 +178,20 @@
           }
           document.querySelector('table tbody').innerHTML = "";
           document.querySelector('table tbody').appendChild(newTable);
+        }
+
+        function formatDate(date) {
+          date = new Date(date * 1000);
+          let month = date.getMonth() + 1;
+          if (month < 10) {
+            month = '0' + month.toString();
+          }
+          let day = date.getDate();
+          if (day < 10) {
+            day = '0' + day.toString();
+          }
+          const year = date.getFullYear();
+          return `${month}/${day}/${year}`;
         }
     </script>
   </body>

@@ -14,53 +14,37 @@ use sqlx::{
     postgres::{PgConnectOptions, PgPool, PgPoolOptions},
     prelude::FromRow,
     query, query_as,
-    types::time::Date,
+    types::time::PrimitiveDateTime,
 };
-use time::Month;
+use time::{macros::format_description, OffsetDateTime, UtcOffset};
 
 #[derive(Serialize, FromRow)]
 struct MovieProposal {
     imdb_id: String,
-    #[serde(serialize_with = "serialize_date")]
-    proposed_on: Date,
+    #[serde(serialize_with = "serialize_time")]
+    proposed_at: PrimitiveDateTime,
     proposed_by: String,
-    #[serde(serialize_with = "serialize_date_option")]
-    watched: Option<Date>,
+    #[serde(serialize_with = "serialize_time_option")]
+    watched_at: Option<PrimitiveDateTime>,
     vetos: i32,
 }
-fn serialize_date<S>(date: &Date, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_time<S>(time: &PrimitiveDateTime, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    let mut result: String = "".into();
-    result += &date.year().to_string();
-    result += "/";
-    result += match &date.month() {
-        Month::January => "1",
-        Month::February => "2",
-        Month::March => "3",
-        Month::April => "4",
-        Month::May => "5",
-        Month::June => "6",
-        Month::July => "7",
-        Month::August => "8",
-        Month::September => "9",
-        Month::October => "10",
-        Month::November => "11",
-        Month::December => "12",
-    };
-    result += "/";
-    result += &date.day().to_string();
-    serializer.serialize_str(&result)
+    serializer.serialize_i64(time.assume_utc().unix_timestamp())
 }
-fn serialize_date_option<S>(date: &Option<Date>, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_time_option<S>(
+    time: &Option<PrimitiveDateTime>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    let Some(date) = date else {
-        return serializer.serialize_str("");
+    let Some(date) = time else {
+        return serializer.serialize_none();
     };
-    serialize_date(date, serializer)
+    serialize_time(date, serializer)
 }
 
 #[derive(Clone)]
@@ -99,6 +83,13 @@ async fn main() {
         serde_json::to_string(&json_obj_or_none).unwrap_or_else(|_| "{}".to_string())
     });
     handlebars.register_helper("toJSON", Box::new(toJSON));
+
+    handlebars_helper!(formatDate: |date: i64| {
+        OffsetDateTime::from_unix_timestamp(date).unwrap()
+        .to_offset(UtcOffset::from_hms(-4, 0, 0).unwrap())
+        .format(format_description!("[month]/[day]/[year]")).unwrap()
+    });
+    handlebars.register_helper("formatDate", Box::new(formatDate));
 
     let reqwest_client = reqwest::Client::builder().use_rustls_tls().build().unwrap();
 
@@ -146,10 +137,13 @@ async fn index(
         reqwest_client,
     }): State<AppState<'_>>,
 ) -> Result<Html<String>, (StatusCode, String)> {
-    let db_query = query_as!(MovieProposal, "SELECT * FROM movies WHERE watched IS NULL")
-        .fetch_all(&pool)
-        .await
-        .expect("Failed to fetch movies");
+    let db_query = query_as!(
+        MovieProposal,
+        "SELECT * FROM movies WHERE watched_at IS NULL"
+    )
+    .fetch_all(&pool)
+    .await
+    .expect("Failed to fetch movies");
 
     let listings = json_movies_from_db(db_query, &reqwest_client).await;
 
@@ -233,7 +227,7 @@ async fn add_movie(
         .unwrap()
         .as_str();
     sqlx::query!(
-        "INSERT INTO movies (imdb_id, proposed_on, proposed_by) VALUES ($1, CURRENT_DATE, $2)",
+        "INSERT INTO movies (imdb_id, proposed_at, proposed_by) VALUES ($1, timezone('utc', now()), $2)",
         parsed_id,
         body.proposed_by
     )
@@ -258,7 +252,7 @@ async fn watch_movie(
     Form(body): Form<WatchMovieBody>,
 ) -> Result<String, (StatusCode, String)> {
     query!(
-        "UPDATE movies SET watched = CURRENT_DATE WHERE imdb_id = $1",
+        "UPDATE movies SET watched_at = timezone('utc', now()) WHERE imdb_id = $1",
         body.imdb_id
     )
     .execute(&pool)

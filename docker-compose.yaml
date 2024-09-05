@@ -11,6 +11,12 @@ services:
       - postgres:/var/lib/postgresql/data
   rust:
     build: .
+    develop:
+      watch:
+        - path: ./src
+          action: rebuild
+        - path: ./templates
+          action: rebuild
     environment:
       DATABASE_URL: ${DATABASE_URL}
       OMDB_KEY: ${OMDB_KEY}

@@ -101,7 +101,7 @@
 
       wheel.onRest = () => {
         document.querySelector('dialog span').innerText = wheel.items[choice].label;
-        document.querySelector('#veto').disabled = wheel.items[choice].value.vetos >= 3;
+        document.querySelector('#veto').disabled = wheel.items[choice].value.db_info.vetos >= 3;
         document.querySelector('dialog').showModal();
       }
 
@@ -111,7 +111,7 @@
         const thisItem = wheel.items[choice];
         fetch("/movies/watch", {
           method: "POST",
-          body: new URLSearchParams({ imdb_id: thisItem.value.imdb_id })
+          body: new URLSearchParams({ imdb_id: thisItem.value.db_info.imdb_id })
         }).then(() => {
           updateMovies(wheel.items.flatMap(i => i === thisItem ? [] : [i.value]))
           document.querySelector('dialog').close();
@@ -122,11 +122,11 @@
         const thisItem = wheel.items[choice];
         fetch("/movies/veto", {
           method: "POST",
-          body: new URLSearchParams({ imdb_id: thisItem.value.imdb_id })
+          body: new URLSearchParams({ imdb_id: thisItem.value.db_info.imdb_id })
         }).then(() => {
           updateMovies(wheel.items.map(i =>
             i === thisItem
-              ? { ...i.value, vetos: i.value.vetos + 1 }
+              ? { ...i.value, db_info: { ...i.value.db_info, vetos: i.value.db_info.vetos + 1 } }
               : i.value
           ))
           document.querySelector('dialog').close();

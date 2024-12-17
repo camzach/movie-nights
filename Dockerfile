@@ -1,4 +1,4 @@
-FROM rust:bookworm as builder
+FROM rust:bookworm AS builder
 
 WORKDIR /usr/src/app
 COPY . .
@@ -23,4 +23,4 @@ WORKDIR /app
 COPY --from=builder /usr/src/app/movie-nights /app/movie-nights
 
 # Run the app
-CMD ./movie-nights /app/
+CMD ./movie-nights

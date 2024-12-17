@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use axum::{
     extract::{Query, State},
     http::StatusCode,
@@ -61,10 +63,12 @@ struct Assets;
 
 #[tokio::main]
 async fn main() {
+    println!("Parsing database vars");
     let db_url: PgConnectOptions = std::env::var("DATABASE_URL")
         .expect("no db url set")
         .parse()
         .expect("failed to parse pgconnectoptions");
+    println!("Connecting to db");
     let pool = PgPoolOptions::new()
         .connect_with(db_url)
         .await
@@ -104,6 +108,7 @@ async fn main() {
             reqwest_client,
         });
 
+    println!("Starting app");
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
 
     axum::serve(listener, app).await.unwrap();
@@ -146,9 +151,14 @@ async fn index(
     .expect("Failed to fetch movies");
 
     let listings = json_movies_from_db(db_query, &reqwest_client).await;
+    let genres: HashSet<String> = listings
+        .iter()
+        .flat_map(|listing| listing.api_info.genre.split(","))
+        .map(|genre| genre.trim().to_string())
+        .collect();
 
     Ok(handlebars
-        .render("index.hbs", &listings)
+        .render("index.hbs", &(listings, genres))
         .expect("Failed to render template")
         .into())
 }

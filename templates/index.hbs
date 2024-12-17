@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.colors.min.css"
+    >
     <style>
       main {
         display: flex;
@@ -17,6 +21,20 @@
           flex-direction: row;
         }
       }
+      details label {
+        &:has(input:not(:checked)) {
+          display: none;
+        }
+        &:has([value="on"]) {
+          background-color: var(--pico-color-green-500);
+        }
+        &:has([value="off"]) {
+          background-color: var(--pico-color-red-500);
+        }
+        input {
+          display: none;
+        }
+      }
     </style>
   </head>
   <body>
@@ -27,6 +45,14 @@
     </dialog>
     <main>
       <div id="wheel"></div>
+      <details>
+        <summary>Genre Filters</summary>
+        {{#each this.[1]}}
+          <label role="button">{{this}} ON<input type="radio" value="on" name="{{this}}"></label>
+          <label role="button">{{this}} OFF<input type="radio" value="off" name="{{this}}"></label>
+          <label role="button">{{this}} ANY<input type="radio" value="any" name="{{this}}" checked></label>
+        {{/each}}
+      </details>
       <div>
         <table id="list">
           <thead>
@@ -34,17 +60,19 @@
               <th>Title</th>
               <th>Year</th>
               <th>Director</th>
+              <th>Genre</th>
               <th>Proposed By</th>
               <th>Proposed On</th>
               <th>Times Vetoed</th>
             </tr>
           </thead>
           <tbody>
-            {{#each this}}
-              <tr>
+            {{#each this.[0]}}
+              <tr data-imdb-id="{{this.db_info.imdb_id}}">
                 <td>{{this.api_info.title}}</td>
                 <td>{{this.api_info.year}}</td>
                 <td>{{this.api_info.director}}</td>
+                <td>{{this.api_info.genre}}</td>
                 <td>{{this.db_info.proposed_by}}</td>
                 <td>{{formatDate this.db_info.proposed_at}}</td>
                 <td>{{this.db_info.vetos}}</td>
@@ -78,16 +106,18 @@
 
       const { Wheel } = spinWheel;
 
-      const wheel = new Wheel(document.querySelector('#wheel'), {
-        items: [
-          {{#each this}}
-          {
-            label: "{{this.api_info.title}} ({{this.api_info.year}})",
-            value: {{{toJSON this}}},
-            backgroundColor: `hsl(${Math.random() * 360}deg 100% 50%)`,
-          },
-          {{/each}}
-        ],
+      const allItems = [
+        {{ #each this.[0] }}
+        {
+          label: "{{this.api_info.title}} ({{this.api_info.year}})",
+          value: {{{toJSON this}}},
+          backgroundColor: `hsl(${Math.random() * 360}deg 100% 50%)`,
+        },
+        {{/each }}
+      ];
+      
+      let wheel = new Wheel(document.querySelector('#wheel'), {
+        items: allItems,
         isInteractive: false,
         pointerAngle: 90,
         overlayImage: pointer
@@ -107,92 +137,156 @@
 
       document.querySelector('dialog').addEventListener('cancel', e => e.preventDefault());
 
+      function replaceWheel(items) {
+        const newWheel = document.createElement('div');
+        newWheel.id = 'wheel';
+        document.querySelector('#wheel').replaceWith(newWheel)
+        wheel = new Wheel(newWheel, {
+          items: items ?? allItems,
+          isInteractive: false,
+          pointerAngle: 90,
+          overlayImage: pointer
+        });
+        newWheel.addEventListener('click', () => {
+          choice = Math.floor(Math.random() * wheel.items.length);
+          wheel.spinToItem(choice, 3000, false, Math.floor(Math.random() * 3) + 1)
+        });
+        wheel.onRest = () => {
+          document.querySelector('dialog span').innerText = wheel.items[choice].label;
+          document.querySelector('#veto').disabled = wheel.items[choice].value.db_info.vetos >= 3;
+          document.querySelector('dialog').showModal();
+        }
+      }
+
       function watch() {
-        const thisItem = wheel.items[choice];
+        const thisItem = wheel.items[choice].value;
         fetch("/movies/watch", {
           method: "POST",
-          body: new URLSearchParams({ imdb_id: thisItem.value.db_info.imdb_id })
+          body: new URLSearchParams({ imdb_id: thisItem.db_info.imdb_id })
         }).then(() => {
-          updateMovies(wheel.items.flatMap(i => i === thisItem ? [] : [i.value]))
+          const idx = allItems.findIndex(i => i.value.db_info.imdb_id === thisItem.db_info.imdb_id);
+          allItems.splice(idx, 1);
+          replaceWheel();
+          document.querySelector('tr[data-imdb-id="' + thisItem.db_info.imdb_id + '"] td:nth-child(7)').remove();
           document.querySelector('dialog').close();
         })
       }
 
       function veto() {
-        const thisItem = wheel.items[choice];
+        const thisItem = wheel.items[choice].value;
         fetch("/movies/veto", {
           method: "POST",
           body: new URLSearchParams({ imdb_id: thisItem.value.db_info.imdb_id })
         }).then(() => {
-          updateMovies(wheel.items.map(i =>
-            i === thisItem
-              ? { ...i.value, db_info: { ...i.value.db_info, vetos: i.value.db_info.vetos + 1 } }
-              : i.value
-          ))
+          thisItem.db_info.vetos += 1;
+          document.querySelector('tr[data-imdb-id="' + thisItem.db_info.imdb_id + '"] td:nth-child(7)').innerText = thisItem.db_info.vetos;
           document.querySelector('dialog').close();
-        })
+        });
       }
 
       function newMovie() {
-          const formData = new FormData(document.querySelector('form'));
-          fetch("/movies", {
-            method: "POST",
-            body: new URLSearchParams(formData),
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-          })
-            .then(res => res.json())
-            .then(updateMovies);
-        }
-        document.querySelector('form [type=submit]').addEventListener('click', newMovie);
-
-        function updateMovies(newList) {
-          newList = newList.filter(item => item.db_info.watched_at === null);
-          wheel.items = newList.map(item => ({
-            label: `${item.api_info.title} (${item.api_info.year})`,
-            value: item,
-            backgroundColor: `hsl(${Math.random() * 360}deg 100% 50%)`
-          }))
-          const newTable = new DocumentFragment();
-          for (const item of newList) {          
+        const formData = new FormData(document.querySelector('form'));
+        fetch("/movies", {
+          method: "POST",
+          body: new URLSearchParams(formData),
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        })
+          .then(res => res.json())
+          .then(json => {
+            let newItem = json.find(el => el.db_info.imdb_id === formData.get('imdb_id'));
+            allItems.push({
+              label: `${newItem.api_info.title} (${newItem.api_info.year})`,
+              value: newItem,
+              backgroundColor: `hsl(${Math.random() * 360}deg 100% 50%)`,
+            });
+            replaceWheel();
             let row = document.createElement('tr');
             const title = document.createElement('td');
-            title.innerText = item.api_info.title;
+            title.innerText = newItem.api_info.title;
             row.appendChild(title);
             const year = document.createElement('td');
-            year.innerText = item.api_info.year;
+            year.innerText = newItem.api_info.year;
             row.appendChild(year);
             const director = document.createElement('td');
-            director.innerText = item.api_info.director;
+            director.innerText = newItem.api_info.director;
             row.appendChild(director);
+            const genre = document.createElement('td');
+            genre.innerText = newItem.api_info.genre;
+            row.appendChild(genre);
             const proposed_by = document.createElement('td');
-            proposed_by.innerText = item.db_info.proposed_by;
+            proposed_by.innerText = newItem.db_info.proposed_by;
             row.appendChild(proposed_by);
             const proposed_at = document.createElement('td');
-            proposed_at.innerText = formatDate(item.db_info.proposed_at);
+            proposed_at.innerText = formatDate(newItem.db_info.proposed_at);
             row.appendChild(proposed_at);
             const vetos = document.createElement('td');
-            vetos.innerText = item.db_info.vetos;
+            vetos.innerText = newItem.db_info.vetos;
             row.appendChild(vetos);
+            document.querySelector('table tbody').appendChild(row);
+          });
+      }
+      document.querySelector('form [type=submit]').addEventListener('click', newMovie);
 
-            newTable.appendChild(row);
-          }
-          document.querySelector('table tbody').innerHTML = "";
-          document.querySelector('table tbody').appendChild(newTable);
+      function formatDate(date) {
+        date = new Date(date * 1000);
+        let month = date.getMonth() + 1;
+        if (month < 10) {
+          month = '0' + month.toString();
         }
+        let day = date.getDate();
+        if (day < 10) {
+          day = '0' + day.toString();
+        }
+        const year = date.getFullYear();
+        return `${month}/${day}/${year}`;
+      }
 
-        function formatDate(date) {
-          date = new Date(date * 1000);
-          let month = date.getMonth() + 1;
-          if (month < 10) {
-            month = '0' + month.toString();
-          }
-          let day = date.getDate();
-          if (day < 10) {
-            day = '0' + day.toString();
-          }
-          const year = date.getFullYear();
-          return `${month}/${day}/${year}`;
+      let hiddenGenres = new Set();
+      let requiredGenres = new Set();
+
+      function filterMovie(genres) {
+        if (genres.some(genre => hiddenGenres.has(genre))) {
+          return false;
         }
+        if (![...requiredGenres].every(genre => genres.includes(genre))) {
+          return false;
+        }
+        return true;
+      }
+
+      document.querySelectorAll('details input').forEach(input => {
+        let genre = input.name;
+        let value = input.value;
+        let nextValue = {
+          'on': 'off',
+          'off': 'any',
+          'any': 'on'
+        }[value];
+        input.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.target.checked = false;
+          document.querySelector(`input[name=${genre}][value=${nextValue}]`).checked = true;
+          if (value === 'on') {
+            hiddenGenres.add(genre);
+            requiredGenres.delete(genre);
+          } else if (value === 'off') {
+            hiddenGenres.delete(genre)
+          } else {
+            requiredGenres.add(genre);
+          }
+          replaceWheel(allItems.filter(item => {
+            const genres = item.value.api_info.genre.split(', ');
+            return filterMovie(genres);
+          }));
+          document.querySelectorAll('tbody tr').forEach((row,i) => {
+            console.log(allItems, i, allItems[i]);
+            const genres = allItems[i].value.api_info.genre.split(', ');
+            console.log(requiredGenres, hiddenGenres, genres);
+            const show = filterMovie(genres);
+            row.hidden = !show;
+          });
+        });
+      });
     </script>
   </body>
 </html>

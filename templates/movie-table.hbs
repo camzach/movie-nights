@@ -1,0 +1,18 @@
+<table id="list">
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Year</th>
+      <th>Director</th>
+      <th>Genre</th>
+      <th>Proposed By</th>
+      <th>Proposed On</th>
+      <th>Times Vetoed</th>
+    </tr>
+  </thead>
+  <tbody hx-swap-oob="true">
+    {{#each this}}
+    {{> movie-row this}}
+    {{/each}}
+  </tbody>
+</table>

@@ -1,16 +1,15 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, path::Path};
 
 use axum::{
     extract::{Query, State},
-    http::StatusCode,
-    response::Html,
+    http::{HeaderMap, StatusCode},
+    response::{Html, IntoResponse, Response},
     routing::{get, post},
     Form, Json, Router,
 };
 use handlebars::{handlebars_helper, Handlebars};
 use regex::Regex;
 use reqwest::Client;
-use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize, Serializer};
 use sqlx::{
     postgres::{PgConnectOptions, PgPool, PgPoolOptions},
@@ -56,11 +55,6 @@ struct AppState<'a> {
     reqwest_client: Client,
 }
 
-#[derive(RustEmbed)]
-#[folder = "templates"]
-#[include = "*.hbs"]
-struct Assets;
-
 #[tokio::main]
 async fn main() {
     println!("Parsing database vars");
@@ -77,9 +71,17 @@ async fn main() {
     sqlx::migrate!().run(&pool).await.unwrap();
 
     let mut handlebars = Handlebars::new();
+    let templates_dir = Path::new("./templates");
     handlebars
-        .register_embed_templates::<Assets>()
-        .expect("Failed to register template");
+        .register_template_file("index", templates_dir.join("index.hbs"))
+        .unwrap();
+    handlebars
+        .register_template_file("movie-table", templates_dir.join("movie-table.hbs"))
+        .unwrap();
+    handlebars
+        .register_template_file("movie-row", templates_dir.join("movie-row.hbs"))
+        .unwrap();
+
     handlebars_helper!(toJSON: |json_obj_or_none: object|
     if json_obj_or_none.is_empty() {
         "{}".into()
@@ -158,7 +160,7 @@ async fn index(
         .collect();
 
     Ok(handlebars
-        .render("index.hbs", &(listings, genres))
+        .render("index", &(listings, genres))
         .expect("Failed to render template")
         .into())
 }
@@ -227,10 +229,12 @@ async fn add_movie(
     State(AppState {
         pool,
         reqwest_client,
+        handlebars,
         ..
     }): State<AppState<'_>>,
+    headers: HeaderMap,
     Form(body): Form<AddMovieBody>,
-) -> Result<Json<Vec<MovieListing>>, (StatusCode, String)> {
+) -> Response {
     let parsed_id = Regex::new(r#"[a-z]{2}\d+"#)
         .unwrap()
         .find(&body.imdb_id)
@@ -250,7 +254,29 @@ async fn add_movie(
         .expect("Failed to retrieve movies");
 
     let listings = json_movies_from_db(db_query, &reqwest_client).await;
-    Ok(Json(listings))
+
+    if headers.get("hx-request").is_some_and(|val| {
+        val.to_str()
+            .expect("hx-request header had bad info")
+            .to_lowercase()
+            == "true"
+    }) {
+        Html(
+            handlebars
+                .render(
+                    "movie-row",
+                    listings
+                        .iter()
+                        .filter(|listing| listing.db_info.imdb_id == parsed_id)
+                        .next()
+                        .unwrap(),
+                )
+                .expect("Failed to render movie row"),
+        )
+        .into_response()
+    } else {
+        Json(listings).into_response()
+    }
 }
 
 #[derive(Deserialize)]

@@ -16,7 +16,8 @@ services:
         - path: ./src
           action: rebuild
         - path: ./templates
-          action: rebuild
+          target: /app/templates
+          action: sync
     environment:
       DATABASE_URL: postgres://postgres:postgres@pg:5432/postgres
       OMDB_KEY: ${OMDB_KEY}

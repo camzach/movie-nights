@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.colors.min.css"
-    >
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.colors.min.css">
+    <script src="https://unpkg.com/htmx.org@1.9.2"></script>
     <style>
       main {
         display: flex;
@@ -40,8 +38,10 @@
   <body>
     <dialog>
       <span></span>
-      <button id="watch" onclick="watch()">Watch</button>
-      <button id="veto" onclick="veto()">Veto</button>
+      <button id="watch" hx-post="/movies/watch" hx-vals="{'imdb_id': choice}" hx-target="closest tr"
+        hx-swap="outerHTML">Watch</button>
+      <button id="veto" hx-post="/movies/veto" hx-vals="{'imdb_id': choice}" hx-target="closest tr"
+        hx-swap="outerHTML">Veto</button>
     </dialog>
     <main>
       <div id="wheel"></div>
@@ -54,33 +54,8 @@
         {{/each}}
       </details>
       <div>
-        <table id="list">
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Year</th>
-              <th>Director</th>
-              <th>Genre</th>
-              <th>Proposed By</th>
-              <th>Proposed On</th>
-              <th>Times Vetoed</th>
-            </tr>
-          </thead>
-          <tbody>
-            {{#each this.[0]}}
-              <tr data-imdb-id="{{this.db_info.imdb_id}}">
-                <td>{{this.api_info.title}}</td>
-                <td>{{this.api_info.year}}</td>
-                <td>{{this.api_info.director}}</td>
-                <td>{{this.api_info.genre}}</td>
-                <td>{{this.db_info.proposed_by}}</td>
-                <td>{{formatDate this.db_info.proposed_at}}</td>
-                <td>{{this.db_info.vetos}}</td>
-              </tr>
-            {{/each}}
-          </tbody>
-        </table>
-        <form action="" onsubmit="return false;">
+        {{> movie-table this.[0]}}
+        <form hx-post="/movies" hx-target="#list tbody" hx-swap="beforeend">
           <fieldset class="grid">
             <label>Your Name<input type="text" name="proposed_by" placeholder="Your Name"></label>
             <label>IMDb ID or Link<input type="text" name="imdb_id" placeholder="IMDb ID"></label>
@@ -115,7 +90,7 @@
         },
         {{/each }}
       ];
-      
+
       let wheel = new Wheel(document.querySelector('#wheel'), {
         items: allItems,
         isInteractive: false,
@@ -157,75 +132,6 @@
           document.querySelector('dialog').showModal();
         }
       }
-
-      function watch() {
-        const thisItem = wheel.items[choice].value;
-        fetch("/movies/watch", {
-          method: "POST",
-          body: new URLSearchParams({ imdb_id: thisItem.db_info.imdb_id })
-        }).then(() => {
-          const idx = allItems.findIndex(i => i.value.db_info.imdb_id === thisItem.db_info.imdb_id);
-          allItems.splice(idx, 1);
-          replaceWheel();
-          document.querySelector('tr[data-imdb-id="' + thisItem.db_info.imdb_id + '"] td:nth-child(7)').remove();
-          document.querySelector('dialog').close();
-        })
-      }
-
-      function veto() {
-        const thisItem = wheel.items[choice].value;
-        fetch("/movies/veto", {
-          method: "POST",
-          body: new URLSearchParams({ imdb_id: thisItem.value.db_info.imdb_id })
-        }).then(() => {
-          thisItem.db_info.vetos += 1;
-          document.querySelector('tr[data-imdb-id="' + thisItem.db_info.imdb_id + '"] td:nth-child(7)').innerText = thisItem.db_info.vetos;
-          document.querySelector('dialog').close();
-        });
-      }
-
-      function newMovie() {
-        const formData = new FormData(document.querySelector('form'));
-        fetch("/movies", {
-          method: "POST",
-          body: new URLSearchParams(formData),
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-        })
-          .then(res => res.json())
-          .then(json => {
-            let newItem = json.find(el => el.db_info.imdb_id === formData.get('imdb_id'));
-            allItems.push({
-              label: `${newItem.api_info.title} (${newItem.api_info.year})`,
-              value: newItem,
-              backgroundColor: `hsl(${Math.random() * 360}deg 100% 50%)`,
-            });
-            replaceWheel();
-            let row = document.createElement('tr');
-            const title = document.createElement('td');
-            title.innerText = newItem.api_info.title;
-            row.appendChild(title);
-            const year = document.createElement('td');
-            year.innerText = newItem.api_info.year;
-            row.appendChild(year);
-            const director = document.createElement('td');
-            director.innerText = newItem.api_info.director;
-            row.appendChild(director);
-            const genre = document.createElement('td');
-            genre.innerText = newItem.api_info.genre;
-            row.appendChild(genre);
-            const proposed_by = document.createElement('td');
-            proposed_by.innerText = newItem.db_info.proposed_by;
-            row.appendChild(proposed_by);
-            const proposed_at = document.createElement('td');
-            proposed_at.innerText = formatDate(newItem.db_info.proposed_at);
-            row.appendChild(proposed_at);
-            const vetos = document.createElement('td');
-            vetos.innerText = newItem.db_info.vetos;
-            row.appendChild(vetos);
-            document.querySelector('table tbody').appendChild(row);
-          });
-      }
-      document.querySelector('form [type=submit]').addEventListener('click', newMovie);
 
       function formatDate(date) {
         date = new Date(date * 1000);

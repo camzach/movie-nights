@@ -21,6 +21,7 @@ WORKDIR /app
 
 # Get compiled binaries from builder's cargo install directory
 COPY --from=builder /usr/src/app/movie-nights /app/movie-nights
+COPY --from=builder /usr/src/app/templates /app/templates
 
 # Run the app
 CMD ./movie-nights

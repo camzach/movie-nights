@@ -1,6 +1,7 @@
 use std::{collections::HashSet, path::Path};
 
 use axum::{
+    debug_handler,
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse, Response},
@@ -49,9 +50,9 @@ where
 }
 
 #[derive(Clone)]
-struct AppState<'a> {
+struct AppState {
     pool: PgPool,
-    handlebars: Handlebars<'a>,
+    handlebars: Handlebars<'static>,
     reqwest_client: Client,
 }
 
@@ -71,6 +72,7 @@ async fn main() {
     sqlx::migrate!().run(&pool).await.unwrap();
 
     let mut handlebars = Handlebars::new();
+    handlebars.set_dev_mode(true);
     let templates_dir = Path::new("./templates");
     handlebars
         .register_template_file("index", templates_dir.join("index.hbs"))
@@ -137,12 +139,13 @@ struct MovieListing {
     db_info: MovieProposal,
 }
 
+#[debug_handler]
 async fn index(
     State(AppState {
         pool,
         handlebars,
         reqwest_client,
-    }): State<AppState<'_>>,
+    }): State<AppState>,
 ) -> Result<Html<String>, (StatusCode, String)> {
     let db_query = query_as!(
         MovieProposal,
@@ -198,7 +201,7 @@ struct ListMoviesParams {
 }
 
 async fn list_movies(
-    State(AppState { pool, .. }): State<AppState<'_>>,
+    State(AppState { pool, .. }): State<AppState>,
     query: Query<ListMoviesParams>,
 ) -> Result<String, (StatusCode, String)> {
     let result: Result<Vec<MovieProposal>, _> = match query.watched {
@@ -231,7 +234,7 @@ async fn add_movie(
         reqwest_client,
         handlebars,
         ..
-    }): State<AppState<'_>>,
+    }): State<AppState>,
     headers: HeaderMap,
     Form(body): Form<AddMovieBody>,
 ) -> Response {
@@ -284,7 +287,7 @@ struct WatchMovieBody {
     imdb_id: String,
 }
 async fn watch_movie(
-    State(AppState { pool, .. }): State<AppState<'_>>,
+    State(AppState { pool, .. }): State<AppState>,
     Form(body): Form<WatchMovieBody>,
 ) -> Result<String, (StatusCode, String)> {
     query!(
@@ -302,15 +305,18 @@ struct VetoMovieBody {
     imdb_id: String,
 }
 async fn veto_movie(
-    State(AppState { pool, .. }): State<AppState<'_>>,
+    State(AppState { pool, .. }): State<AppState>,
     Form(body): Form<VetoMovieBody>,
 ) -> Result<String, (StatusCode, String)> {
-    query!(
-        "UPDATE movies SET vetos = movies.vetos + 1 WHERE imdb_id = $1",
+    let query_result = query!(
+        "UPDATE movies SET vetos = movies.vetos + 1 WHERE imdb_id = $1 RETURNING vetos",
         body.imdb_id
     )
-    .execute(&pool)
+    .fetch_all(&pool)
     .await
     .expect("Failed to update movie");
-    Ok("Done".into())
+
+    let query_result = query_result.first().expect("Failed to update movie");
+
+    Ok(query_result.vetos.to_string())
 }

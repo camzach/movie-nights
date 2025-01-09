@@ -6,7 +6,7 @@
     <title>Document</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.colors.min.css">
-    <script src="https://unpkg.com/htmx.org@1.9.2"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <style>
       main {
         display: flex;
@@ -38,10 +38,30 @@
   <body>
     <dialog>
       <span></span>
-      <button id="watch" hx-post="/movies/watch" hx-vals="{'imdb_id': choice}" hx-target="closest tr"
-        hx-swap="outerHTML">Watch</button>
-      <button id="veto" hx-post="/movies/veto" hx-vals="{'imdb_id': choice}" hx-target="closest tr"
-        hx-swap="outerHTML">Veto</button>
+      <form>
+        <button
+          type="submit"
+          id="watch"
+          hx-post="/movies/watch"
+          hx-vals="javascript:{'imdb_id': wheel.items[choice].value.imdb_id}"
+          hx-target="tr[data-spun]"
+          hx-swap="delete"
+          hx-on::after-on-load="document.querySelector('dialog').close()"
+        >
+          Watch
+        </button>
+        <button
+          type="submit"
+          id="veto"
+          hx-post="/movies/veto"
+          hx-vals="javascript:{'imdb_id': wheel.items[choice].value.imdb_id}"
+          hx-target="tr[data-spun] td[data-vetos]"
+          hx-swap="textContent"
+          hx-on::after-on-load="document.querySelector('dialog').close()"
+        >
+          Veto
+        </button>
+      </form>
     </dialog>
     <main>
       <div id="wheel"></div>
@@ -55,7 +75,11 @@
       </details>
       <div>
         {{> movie-table this.[0]}}
-        <form hx-post="/movies" hx-target="#list tbody" hx-swap="beforeend">
+        <form
+          hx-post="/movies"
+          hx-target="#list tbody"
+          hx-swap="beforeend"
+        >
           <fieldset class="grid">
             <label>Your Name<input type="text" name="proposed_by" placeholder="Your Name"></label>
             <label>IMDb ID or Link<input type="text" name="imdb_id" placeholder="IMDb ID"></label>
@@ -81,71 +105,48 @@
 
       const { Wheel } = spinWheel;
 
-      const allItems = [
-        {{ #each this.[0] }}
-        {
-          label: "{{this.api_info.title}} ({{this.api_info.year}})",
-          value: {{{toJSON this}}},
-          backgroundColor: `hsl(${Math.random() * 360}deg 100% 50%)`,
-        },
-        {{/each }}
-      ];
+      let wheel, choice;
 
-      let wheel = new Wheel(document.querySelector('#wheel'), {
-        items: allItems,
-        isInteractive: false,
-        pointerAngle: 90,
-        overlayImage: pointer
-      });
-
-      let choice;
-      document.querySelector('#wheel').addEventListener('click', () => {
-        choice = Math.floor(Math.random() * wheel.items.length);
-        wheel.spinToItem(choice, 3000, false, Math.floor(Math.random() * 3) + 1)
-      });
-
-      wheel.onRest = () => {
-        document.querySelector('dialog span').innerText = wheel.items[choice].label;
-        document.querySelector('#veto').disabled = wheel.items[choice].value.db_info.vetos >= 3;
-        document.querySelector('dialog').showModal();
-      }
-
-      document.querySelector('dialog').addEventListener('cancel', e => e.preventDefault());
-
-      function replaceWheel(items) {
+      function newWheel() {
         const newWheel = document.createElement('div');
         newWheel.id = 'wheel';
-        document.querySelector('#wheel').replaceWith(newWheel)
+        document.querySelector('#wheel').replaceWith(newWheel);
+        const items = Array.from(document.querySelectorAll('tbody tr:not([hidden])'), (item) => {
+          const [title, year, director, genre, proposed_by, proposed_on, vetos] = Array.from(item.querySelectorAll('td'), i => i.innerText);
+          const imdb_id = item.getAttribute('data-imdb-id');
+          return { title, year, director, genre, proposed_by, proposed_on, vetos, imdb_id };
+        })
         wheel = new Wheel(newWheel, {
-          items: items ?? allItems,
+          items: items.map(item => ({
+            label: `${item.title} (${item.year})`,
+            value: item,
+            backgroundColor: `hsl(${Math.random() * 360}deg 100% 50%)`,
+          })),
           isInteractive: false,
           pointerAngle: 90,
           overlayImage: pointer
         });
         newWheel.addEventListener('click', () => {
+          let row = document.querySelector(`tr[data-imdb-id=${wheel.items[choice]?.value.imdb_id}]`);
+          if (row) {
+            row.removeAttribute('data-spun');
+          }
           choice = Math.floor(Math.random() * wheel.items.length);
-          wheel.spinToItem(choice, 3000, false, Math.floor(Math.random() * 3) + 1)
+          wheel.spinToItem(choice, 3000, false, Math.floor(Math.random() * 3) + 1);
+          row = document.querySelector(`tr[data-imdb-id=${wheel.items[choice].value.imdb_id}]`);
+          row.setAttribute('data-spun', true);
         });
         wheel.onRest = () => {
           document.querySelector('dialog span').innerText = wheel.items[choice].label;
-          document.querySelector('#veto').disabled = wheel.items[choice].value.db_info.vetos >= 3;
+          document.querySelector('#veto').disabled = wheel.items[choice].value.vetos >= 3;
           document.querySelector('dialog').showModal();
         }
       }
+      let observer = new MutationObserver(newWheel);
+      observer.observe(document.querySelector('table'), { subtree: true, childList: true, attributes: true, attributeFilter: ['hidden'] });
+      newWheel();
 
-      function formatDate(date) {
-        date = new Date(date * 1000);
-        let month = date.getMonth() + 1;
-        if (month < 10) {
-          month = '0' + month.toString();
-        }
-        let day = date.getDate();
-        if (day < 10) {
-          day = '0' + day.toString();
-        }
-        const year = date.getFullYear();
-        return `${month}/${day}/${year}`;
-      }
+      document.querySelector('dialog').addEventListener('cancel', e => e.preventDefault());
 
       let hiddenGenres = new Set();
       let requiredGenres = new Set();
@@ -180,14 +181,8 @@
           } else {
             requiredGenres.add(genre);
           }
-          replaceWheel(allItems.filter(item => {
-            const genres = item.value.api_info.genre.split(', ');
-            return filterMovie(genres);
-          }));
           document.querySelectorAll('tbody tr').forEach((row,i) => {
-            console.log(allItems, i, allItems[i]);
-            const genres = allItems[i].value.api_info.genre.split(', ');
-            console.log(requiredGenres, hiddenGenres, genres);
+            const genres = row.querySelector('td:nth-child(4)').textContent.split(', ');
             const show = filterMovie(genres);
             row.hidden = !show;
           });

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE movies SET vetos = movies.vetos + 1 WHERE imdb_id = $1 RETURNING vetos",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "vetos",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b0cdf297e5ad8a657bcc12120e3f19a717c53df2b544b69a6fc7440baf79e611"
+}
